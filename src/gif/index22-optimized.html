@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清凉一夏 - 优化版</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+
+        }
+
+        .message-container {
+            height: calc(100vh - 100px);
+            overflow: hidden;
+            position: relative;
+            color: #000;
+            border-radius: 5px;
+            box-sizing: border-box;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 100px;
+        }
+
+        .message-list {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            will-change: transform;
+        }
+
+        .message-item {
+            padding: 10px;
+            margin: 10px 5px;
+            border-radius: 8px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 160px;
+            position: absolute;
+            width: calc(100% - 20px);
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            will-change: transform, opacity;
+
+        }
+
+        .message-item.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .message-item.removing {
+            opacity: 0;
+            transform: translateY(-20px);
+            transition: all 0.3s cubic-bezier(0.55, 0.055, 0.675, 0.19);
+        }
+
+        .user {
+            color: #ffcc00;
+            font-weight: bold;
+            font-size: 40px;
+        }
+
+        .gift {
+            color: #ff6666;
+            font-weight: bold;
+        }
+
+        .user-avatar {
+            width: 200px;
+            height: 200px;
+            margin-top: 8px;
+            object-fit: cover;
+            /* border: 6px solid #000; */
+        }
+
+        .glod {
+            border: 6px solid rgb(253, 116, 0);
+            ;
+        }
+
+        .rose-glod {
+            border: 6px solid #ff6666;
+        }
+
+        .silver {
+            border: 6px solid #C0C0C0;
+        }
+
+        .message-scope {
+            color: rgba(255, 0, 0, 0.555);
+            font-size: 2em;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transform: rotate(330deg);
+            pointer-events: none;
+        }
+
+        .message-scope span {
+            font-size: 2.2em;
+            font-family: '阿里妈妈数黑体 Bold', '黑体-简', 'Arial Narrow', Arial, sans-serif;
+            font-weight: bold;
+            opacity: 1;
+            color: red
+        }
+
+        .gif {
+            color: red;
+            font-size: 4em;
+            font-weight: bold;
+            position: absolute;
+            top: -10px;
+            left: 20%;
+            width: 70px;
+            height: 70px;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .gif img {
+            width: 150px;
+            height: 150px;
+        }
+
+        /* 优化GPU加速 */
+        .message-list,
+        .message-item {
+            transform: translateZ(0);
+            backface-visibility: hidden;
+            perspective: 1000px;
+            width: 100px;
+        }
+
+        /* 在线链接服务仅供平台体验和调试使用，平台不承诺服务的稳定性，企业客户需下载字体包自行发布使用并做好备份。 */
+        @font-face {
+            font-family: "阿里妈妈数黑体 Bold";
+            font-weight: 700;
+            src: url("//at.alicdn.com/wf/webfont/jgGjJ3ckKOwU/3yFOWY2n7Ghi.woff2") format("woff2"),
+                url("//at.alicdn.com/wf/webfont/jgGjJ3ckKOwU/uJUHJcp4AJJl.woff") format("woff");
+            font-display: swap;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="message-container">
+        <div class="message-list" id="messageList"></div>
+    </div>
+
+    <script>
+let isSpeaking = false;
+let currentUtterance = null;
+const synth = window.speechSynthesis;
+
+function startSpeech(text) {
+    // 如果当前正在播放语音，则不执行新的语音
+    if (isSpeaking) {
+        console.log('当前正在播放语音，忽略新语音:', text);
+        return;
+    }
+
+    // 取消任何正在播放的语音
+    synth.cancel();
+    
+    isSpeaking = true;
+
+    // 创建语音实例
+    currentUtterance = new SpeechSynthesisUtterance(text);
+    currentUtterance.lang = 'zh-CN';
+    currentUtterance.rate = 1.2;
+    currentUtterance.pitch = 1.0;
+    currentUtterance.volume = 1.0;
+
+    // 确保语音引擎已加载
+    const voices = synth.getVoices();
+    if (voices.length > 1) {
+        currentUtterance.voice = voices[1];
+    }
+
+    // 语音事件监听
+    currentUtterance.onstart = () => {
+        console.log('开始朗读:', text);
+    };
+
+    currentUtterance.onend = () => {
+        console.log('朗读结束');
+        isSpeaking = false;
+        currentUtterance = null;
+    };
+
+    currentUtterance.onerror = (event) => {
+        console.error('语音错误:', event);
+        isSpeaking = false;
+        currentUtterance = null;
+    };
+
+    // 执行朗读
+    synth.speak(currentUtterance);
+}
+        class MessageManager {
+            constructor() {
+                this.messageList = document.getElementById('messageList');
+                this.messages = [];
+                this.messageHeight = 250; // 每条消息的高度
+                this.maxVisibleMessages = Math.ceil(window.innerHeight / this.messageHeight) + 2;
+                this.animationQueue = [];
+                this.isAnimating = false;
+                this.messageBuffer = [];
+                this.isProcessingBuffer = false;
+
+                // 语音相关
+                this.synth = window.speechSynthesis;
+                this.utterance = null;
+
+                this.init();
+            }
+
+            init() {
+                // 使用RAF优化动画
+                this.processAnimationQueue();
+
+                // 监听窗口大小变化
+                window.addEventListener('resize', this.handleResize.bind(this));
+            }
+
+            handleResize() {
+                this.maxVisibleMessages = Math.ceil(window.innerHeight / this.messageHeight) + 2;
+                this.updateMessagePositions();
+            }
+
+            // 优化的RAF动画循环
+            processAnimationQueue() {
+                if (this.animationQueue.length > 0 && !this.isAnimating) {
+                    this.isAnimating = true;
+                    const animation = this.animationQueue.shift();
+                    animation().then(() => {
+                        this.isAnimating = false;
+                        // 继续处理队列
+                        if (this.animationQueue.length > 0) {
+                            requestAnimationFrame(() => this.processAnimationQueue());
+                        }
+                    });
+                } else if (this.animationQueue.length > 0) {
+                    requestAnimationFrame(() => this.processAnimationQueue());
+                }
+            }
+
+            // 添加消息到动画队列
+            addMessage(user, gift, amount, avatarUrl, type, messageData) {
+                this.animationQueue.push(() => this.createMessage(user, gift, amount, avatarUrl, type, messageData));
+                this.processAnimationQueue();
+            }
+
+            // 创建消息元素
+            async createMessage(user, gift, amount, avatarUrl, type, messageData) {
+                return new Promise((resolve) => {
+                    const messageElement = document.createElement('div');
+                    messageElement.className = 'message-item';
+                    messageElement.dataset.id = Date.now() + Math.random();
+                    const scope_num = getRandomInt(73, 100);
+                    // 创建头像
+                    const avatar = document.createElement('img');
+                    let avatarClass = 'user-avatar'; // 默认基础类
+
+                    if (scope_num === 100) {
+                        avatarClass += ' gold';       // 金牌
+                    } else if (scope_num >= 90 && scope_num < 100) {
+                        avatarClass += ' rose-gold';  // 玫瑰金
+                    } else if (scope_num >= 80 && scope_num < 90) {
+                        avatarClass += ' silver';     // 银牌
+                    }
+
+                    avatar.className = avatarClass;   // 一次性赋值
+                    avatar.src = avatarUrl;
+                    avatar.alt = `${user}的头像`;
+                    messageElement.appendChild(avatar);
+
+                    // 创建得分
+                    const scope = document.createElement('div');
+                    scope.className = 'message-scope';
+
+                    scope.innerHTML = `得分<span>${scope_num}</span>`;
+                    messageElement.appendChild(scope);
+                    // 创建得分
+                    const gif = document.createElement('img');
+                    gif.className = 'gif';
+                    const num = getRandomInt(1, 3);
+                    gif.src = `./gif/${num}.gif`;
+                    messageElement.appendChild(gif);
+
+                    // 添加到DOM
+                    this.messageList.appendChild(messageElement);
+
+                    // 添加到消息数组
+                    this.messages.push({
+                        element: messageElement,
+                        id: messageElement.dataset.id,
+                        timestamp: Date.now()
+                    });
+
+                    // 使用RAF确保DOM更新后再添加动画
+                    requestAnimationFrame(() => {
+                        this.updateMessagePositions();
+
+                        // 延迟显示动画
+                        setTimeout(() => {
+                            messageElement.classList.add('visible');
+                        }, 50);
+
+                        // 清理旧消息
+                        this.cleanupOldMessages();
+
+                        resolve();
+                    });
+
+                    // 语音处理
+                    this.handleSpeech(type);
+                });
+            }
+
+            // 更新消息位置
+            updateMessagePositions() {
+                const containerHeight = this.messageList.offsetHeight;
+                const visibleMessages = this.messages.slice(-this.maxVisibleMessages);
+
+                visibleMessages.forEach((msg, index) => {
+                    const position = containerHeight - (visibleMessages.length - index) * this.messageHeight;
+                    msg.element.style.top = `${position}px`;
+                });
+            }
+
+            // 清理旧消息
+            cleanupOldMessages() {
+                if (this.messages.length > this.maxVisibleMessages) {
+                    const messagesToRemove = this.messages.splice(0, this.messages.length - this.maxVisibleMessages);
+
+                    messagesToRemove.forEach(msg => {
+                        msg.element.classList.add('removing');
+
+                        setTimeout(() => {
+                            if (msg.element.parentNode) {
+                                this.messageList.removeChild(msg.element);
+                            }
+                        }, 300);
+                    });
+                }
+            }
+
+            // 语音处理
+            handleSpeech(type) {
+                if (this.synth.speaking) {
+                    this.synth.cancel();
+                }
+
+                if (type === 5 || type === 3 || type === 4) {
+                    // 可以在这里添加语音播放逻辑
+                }
+            }
+
+            // 消息缓冲处理
+            async processMessageBuffer() {
+                if (this.isProcessingBuffer || this.messageBuffer.length === 0) return;
+
+                this.isProcessingBuffer = true;
+
+                while (this.messageBuffer.length > 0) {
+                    const msg = this.messageBuffer.shift();
+                    this.addMessage(msg.user, msg.gift, msg.amount, msg.avatarUrl, msg.type, msg.message);
+
+                    // 控制消息处理速度
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+
+                this.isProcessingBuffer = false;
+            }
+
+            // 添加消息到缓冲区
+            bufferMessage(user, gift, amount, avatarUrl, type, message) {
+                // console.log('缓冲消息:', user, gift, amount, avatarUrl, type, message);
+                this.messageBuffer.push({
+                    user,
+                    gift,
+                    amount,
+                    avatarUrl,
+                    type,
+                    message
+                });
+
+                this.processMessageBuffer();
+            }
+        }
+
+        // 初始化消息管理器
+        const messageManager = new MessageManager();
+
+        // WebSocket连接
+        const socket = new WebSocket('ws://127.0.0.1:8888');
+
+        socket.onopen = function () {
+            console.log('WebSocket连接已建立');
+        };
+
+        socket.onmessage = function (event) {
+            const originalMsg = JSON.parse(event.data);
+            const message = JSON.parse(originalMsg.Data);
+            // console.log(message);
+            let avatar = message.User?.HeadImgUrl || '';
+            let username = message.User?.Nickname || '用户';
+
+            // 处理用户名
+            username = processUsername(username);
+            switch (originalMsg.Type) {
+                case 1: // 普通弹幕       
+                    content = 'hello'
+                    break;
+                case 2: // 点赞消息
+                    content = `感谢 ${username} 的点赞`;
+                    messageManager.bufferMessage(
+                        username,
+                        0,
+                        0,
+                        avatar,
+                        originalMsg.Type,
+                        message
+                    );
+                   if(!isSpeaking) {
+                    startSpeech(content);
+                   }
+                    break;
+                case 3: // 进入直播间消息
+                    content = `欢迎 ${username} 进入直播间`;
+                    break;
+                case 4: // 关注消息
+                    content = `感谢 ${username} 的关注`
+                    messageManager.bufferMessage(
+                        username,
+                        0,
+                        0,
+                        avatar,
+                        originalMsg.Type,
+                        message
+                    );
+                    if(!isSpeaking) {
+                    startSpeech(content);
+                   }
+                    break;
+                case 5: // 礼物消息
+                    content = `感谢 ${username} 送的 礼物`
+                    messageManager.bufferMessage(
+                        username,
+                        0,
+                        0,
+                        avatar,
+                        originalMsg.Type,
+                        message
+                    );
+                    if(!isSpeaking) {
+                    startSpeech(content);
+                   }
+                    break;
+                default:
+                    break;
+            }
+
+
+        };
+
+        socket.onclose = function () {
+            console.log('WebSocket连接已关闭');
+        };
+
+        socket.onerror = function (error) {
+            console.log('WebSocket错误: ' + error);
+        };
+
+        // 用户名处理函数
+        const processUsername = (username) => {
+            if (username.startsWith('用户')) {
+                const remainingPart = username.slice(2);
+                if (/^\d{4}$/.test(remainingPart)) {
+                    return '用户' + remainingPart;
+                }
+            }
+
+            if (username.startsWith('user')) {
+                const remainingPart = username.slice(4);
+                if (/^\d{4}$/.test(remainingPart)) {
+                    return 'user' + remainingPart;
+                }
+            }
+
+            let result = '';
+            if (username.indexOf('*') > -1) {
+                return username.charAt(0);
+            }
+
+            for (let i = 0; i < username.length; i++) {
+                let charCode = username.charCodeAt(i);
+                if ((charCode >= 0x4e00 && charCode <= 0x9fff) ||
+                    (charCode >= 48 && charCode <= 57) ||
+                    (charCode >= 65 && charCode <= 90) ||
+                    (charCode >= 97 && charCode <= 122)) {
+                    result += username[i];
+                }
+            }
+            return result;
+        };
+
+        function getRandomInt(min, max) {
+            min = Math.ceil(min);
+            max = Math.floor(max);
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+    </script>
+</body>
+
+</html>
